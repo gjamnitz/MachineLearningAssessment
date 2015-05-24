@@ -5,20 +5,21 @@ date: "Sunday, May 24, 2015"
 output: html_document
 ---
 
-##Introduction
-Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project the goal was to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+###Introduction
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project I used data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants (who were asked to perform barbell lifts correctly and incorrectly in 5 different ways). The project goal was to predict the way they performed the training. 
 
-##Loading data
+###Loading data
 Empty and '#DIV/0!' values were translated to NA's.
 ```{r}
 suppressMessages(suppressWarnings(library(caret)))
 suppressMessages(suppressWarnings(library(randomForest)))
 training <- read.csv("pml-training.csv", na.strings=c("NA","#DIV/0!",""))
 testing <- read.csv("pml-testing.csv", na.strings=c("NA","#DIV/0!",""))
+dim(training)
 ```
 
-##Preprocessing data
-Removing unnecessary (misleading) variables and summary rows (where *new_window == true*).
+###Preprocessing data
+First I removed unnecessary (misleading) variables (e.g participant name, timestamp fields) and summary rows (where *new_window == true*) - because these rows contain summarized data. Test data has been preprocessed the same way.
 ```{r}
 training <- training[training$new_window == 'no', ]
 training$X <- NULL
@@ -28,17 +29,27 @@ training$raw_timestamp_part_2 <- NULL
 training$cvtd_timestamp <- NULL
 training$num_window <- NULL
 training$new_window <- NULL
+
+testing <- testing[testing$new_window == 'no', ]
+testing$X <- NULL
+testing$user_name <- NULL
+testing$raw_timestamp_part_1 <- NULL
+testing$raw_timestamp_part_2 <- NULL
+testing$cvtd_timestamp <- NULL
+testing$num_window <- NULL
+testing$new_window <- NULL
 ```
 
-Removing all NA variables from training set (only 53 columns remained)
+Finally, I removed 'all NA' variables from training set (only 53 columns remained).
 ```{r}
 notEmptyCols <- colSums(is.na(training)) != nrow(training)
 training <- training[, notEmptyCols]
+testing <- testing[, notEmptyCols]
 dim(training)
 ```
 
-##Cross validation 
-Splitting the cleaned training set into 2 parts.
+### Splitting training data 
+I split the cleaned training set into training and testing parts. As sample size is quite large, we can use 60% training / 40% testing rule and cross validation is not necessary.
 ```{r}
 inTrain <- createDataPartition(y = training$classe, p=0.6, list=FALSE)
 trainingTrain <- training[inTrain, ]
@@ -47,32 +58,36 @@ dim(trainingTrain)
 dim(trainingTest)
 ```
 
-## Building the model
-I chose Random Forest model for prediction.
+### Building the model
+I chose Random Forest model for prediction:
 ```{r}
 modelRf <- train(y = as.factor(trainingTrain$classe), x = trainingTrain[, -53], method = "rf",
                   tuneGrid=data.frame(mtry=3), trControl = trainControl(method="none"))
 
 ```
-We can see that sensitivity and specificity are both high and confusion matrix is convincing as well.
 
-## The final model
+### The final model
 ```{r}
 modelRf$finalModel
 ```
-The model tried 500 trees. The confusion matrix shows that this model is quite efficient.
+The confusion matrix shows that this model is quite efficient and estimated error rate is below 1%. 
 
 The following graph shows the relative importance of the variables in final model:
 ```{r fig.width=9, fig.height=7}
 plot(varImp(modelRf))
 ```
 
-
-## Checking model accuracy with the training subset
+### Checking model accuracy with the training subset
 ```{r}
 confusionMatrix(predict(modelRf, trainingTest), trainingTest$classe)
 ```
 Accuracy is near to 100% and the confusion matrix seems to be almost excellent.
 
-##Conclusion
+### Predicting test data using the new model
+```{r}
+answers <- predict(modelRf, newdata = testing)
+answers
+```
+
+###Conclusion
 Random Forest model was a good choice for predicting Weight Lifting Exercise types. 
